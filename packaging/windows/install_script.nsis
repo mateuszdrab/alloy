@@ -84,9 +84,9 @@ Section "install"
   # fully stop before copying files. Without the wait, Windows will lock the
   # in-use executables and the file copy will fail silently, resulting in a
   # broken install with updated registry metadata but old binaries on disk.
-  nsExec::ExecToLog 'sc stop "Alloy"'
-  Pop $0
-  nsExec::ExecToLog `powershell -NonInteractive -Command "$$svc = Get-Service -Name 'Alloy' -ErrorAction SilentlyContinue; if ($$svc) { $$svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30)) }"`
+  # "net stop" is synchronous and waits until the service reaches STOPPED state,
+  # unlike "sc stop" which returns immediately after sending the stop signal.
+  nsExec::ExecToLog 'net stop "Alloy"'
   Pop $0
 
   # Configure the out path and copy files to it.
@@ -289,9 +289,9 @@ Section "uninstall"
   # Stop and remove service. Wait for the service to fully stop before
   # deleting it and removing the install directory, otherwise Windows will
   # lock in-use files and the removal will fail.
-  nsExec::ExecToLog 'sc stop "Alloy"'
-  Pop $0
-  nsExec::ExecToLog `powershell -NonInteractive -Command "$$svc = Get-Service -Name 'Alloy' -ErrorAction SilentlyContinue; if ($$svc) { $$svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30)) }"`
+  # "net stop" is synchronous and waits until the service reaches STOPPED state,
+  # unlike "sc stop" which returns immediately after sending the stop signal.
+  nsExec::ExecToLog 'net stop "Alloy"'
   Pop $0
   nsExec::ExecToLog 'sc delete "Alloy"'
   Pop $0

@@ -80,8 +80,13 @@ Section "install"
     Pop $0
   ${EndIf}
 
-  # Preemptively stop the existing service if it's running.
-  nsExec::ExecToLog 'sc stop "Alloy"'
+  # Preemptively stop the existing service if it's running and wait for it to
+  # fully stop before copying files. Without the wait, Windows will lock the
+  # in-use executables and the file copy will fail silently, resulting in a
+  # broken install with updated registry metadata but old binaries on disk.
+  # "net stop" is synchronous and waits until the service reaches STOPPED state,
+  # unlike "sc stop" which returns immediately after sending the stop signal.
+  nsExec::ExecToLog 'net stop "Alloy"'
   Pop $0
 
   # Configure the out path and copy files to it.
@@ -281,8 +286,12 @@ FunctionEnd
 Section "uninstall"
   DetailPrint "Starting uninstaller."
 
-  # Stop and remove service.
-  nsExec::ExecToLog 'sc stop "Alloy"'
+  # Stop and remove service. Wait for the service to fully stop before
+  # deleting it and removing the install directory, otherwise Windows will
+  # lock in-use files and the removal will fail.
+  # "net stop" is synchronous and waits until the service reaches STOPPED state,
+  # unlike "sc stop" which returns immediately after sending the stop signal.
+  nsExec::ExecToLog 'net stop "Alloy"'
   Pop $0
   nsExec::ExecToLog 'sc delete "Alloy"'
   Pop $0

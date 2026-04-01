@@ -62,7 +62,7 @@ var (
 type Arguments struct {
 	DataSourceName                alloytypes.Secret   `alloy:"data_source_name,attr"`
 	ForwardTo                     []loki.LogsReceiver `alloy:"forward_to,attr"`
-	Targets                       []discovery.Target  `alloy:"targets,attr"`
+	Targets                       []discovery.Target  `alloy:"targets,attr,optional"`
 	EnableCollectors              []string            `alloy:"enable_collectors,attr,optional"`
 	DisableCollectors             []string            `alloy:"disable_collectors,attr,optional"`
 	ExcludeSchemas                []string            `alloy:"exclude_schemas,attr,optional"`
@@ -460,15 +460,20 @@ func (c *Component) connectAndStartCollectors(ctx context.Context) error {
 		c.exporterCollector = nil
 	}
 
-	if c.args.PrometheusExporter != nil {
+	if len(c.args.Targets) == 0 {
+		if c.args.PrometheusExporter == nil {
+			d := PrometheusExporterArguments(exporter_mysql.DefaultArguments)
+			c.args.PrometheusExporter = &d
+		}
 		exporterArgs := exporter_mysql.Arguments(*c.args.PrometheusExporter)
 		exporterCfg := exporterArgs.Convert()
 		scrapers := mysqld_exporter.GetScrapers(exporterCfg)
 		slogLogger := slog.New(logging.NewSlogGoKitHandler(c.opts.Logger))
-		exporter := mysqld_collector.New(context.Background(), string(c.args.DataSourceName), scrapers, slogLogger, mysqld_collector.Config{
-			LockTimeout:   exporterCfg.LockWaitTimeout,
-			SlowLogFilter: exporterCfg.LogSlowFilter,
-		})
+		exporter := mysqld_collector.New(context.Background(), string(c.args.DataSourceName), scrapers, slogLogger,
+			mysqld_collector.EnableLockWaitTimeout(exporterCfg.EnableLockWaitTimeout),
+			mysqld_collector.SetLockWaitTimeout(exporterCfg.LockWaitTimeout),
+			mysqld_collector.SetSlowLogFilter(exporterCfg.LogSlowFilter),
+		)
 		if err := c.registry.Register(exporter); err != nil {
 			return fmt.Errorf("failed to register prometheus_exporter collector: %w", err)
 		}
